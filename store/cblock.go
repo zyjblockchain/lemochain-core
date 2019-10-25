@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/LemoFoundationLtd/lemochain-core/chain/types"
 	"github.com/LemoFoundationLtd/lemochain-core/common"
+	"github.com/LemoFoundationLtd/lemochain-core/common/log"
 	"math/big"
 	"strconv"
 )
@@ -88,7 +89,7 @@ func (block *CBlock) filterCandidates(accounts []*types.AccountData) []*Candidat
 	return candidates
 }
 
-func (block *CBlock) data(candidates []*Candidate) ([]*Candidate, []*Candidate) {
+func (block *CBlock) getInAndOut(candidates []*Candidate) ([]*Candidate, []*Candidate) {
 	in := block.Top.GetTop()
 	out := make([]*Candidate, 0)
 
@@ -167,21 +168,27 @@ func (block *CBlock) Ranking(voteLogs types.ChangeLogSlice) {
 	if len(voteLogs) <= 0 {
 		return
 	}
+	// collect changed candidates
 	candidates := make([]*Candidate, 0)
 	for _, changelog := range voteLogs {
-		newVote := changelog.NewVal.(big.Int)
+		newVote, ok := changelog.NewVal.(big.Int)
+		if !ok {
+			log.Error("vote log is required!", "changLog", changelog.String())
+			continue
+		}
 		candidates = append(candidates, &Candidate{
 			Address: changelog.Address,
 			Total:   new(big.Int).Set(&newVote),
 		})
 	}
-	// update global candidates
+	// update candidates' data in global list
 	block.dye(candidates)
+	// remove unregistered candidates
 	unregisters := block.collectUnregisters()
 	block.Top.Top = filterUnregisters(block.Top.Top, unregisters)
 	candidates = filterUnregisters(candidates, unregisters)
-
-	updated30, changedOut30 := block.data(candidates)
+	// update top 30
+	updated30, changedOut30 := block.getInAndOut(candidates)
 	if block.Top.Count() < max_candidate_count {
 		block.lessThan30(updated30, changedOut30)
 	} else {

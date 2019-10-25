@@ -595,7 +595,7 @@ func TestChainDatabase_CandidatesRanking(t *testing.T) {
 	for index := 0; index < count; index++ {
 		actDatabase.Put(candidates[index], 1)
 	}
-	cacheChain.CandidatesRanking(block1.Hash())
+	cacheChain.CandidatesRanking(block1.Hash(), nil)
 	cacheChain.SetStableBlock(block1.Hash())
 
 	top := cacheChain.GetCandidatesTop(block1.Hash())

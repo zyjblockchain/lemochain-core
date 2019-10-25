@@ -11,42 +11,32 @@ import (
 	"testing"
 )
 
-func NewAccountData(address common.Address, isCandidate bool) *types.AccountData {
+func NewAccountData(addressNumber int) *types.AccountData {
+	address := common.HexToAddress(strconv.Itoa(addressNumber))
 	account := &types.AccountData{
 		Address:       address,
 		Balance:       new(big.Int).SetInt64(100),
 		NewestRecords: make(map[types.ChangeLogType]types.VersionRecord),
-	}
-
-	account.Candidate.Profile = make(types.Profile)
-	if isCandidate {
-		account.Candidate.Votes = new(big.Int).SetInt64(500)
-		account.Candidate.Profile[types.CandidateKeyIsCandidate] = "true"
-	} else {
-		account.Candidate.Votes = new(big.Int)
+		Candidate: types.Candidate{
+			Profile: make(types.Profile),
+			Votes:   new(big.Int),
+		},
 	}
 
 	return account
 }
 
-func NewAccountDataWithVotes(address common.Address, val int64) *types.AccountData {
-	account := &types.AccountData{
-		Address:       address,
-		Balance:       new(big.Int).SetInt64(100),
-		NewestRecords: make(map[types.ChangeLogType]types.VersionRecord),
-	}
-
-	account.Candidate.Profile = make(types.Profile)
-	account.Candidate.Votes = new(big.Int).SetInt64(val)
+func NewCandidateAccountData(addressNumber int, val int64) *types.AccountData {
+	account := NewAccountData(addressNumber)
 	account.Candidate.Profile[types.CandidateKeyIsCandidate] = "true"
-
+	account.Candidate.Votes = new(big.Int).SetInt64(val)
 	return account
 }
 
 func NewAccountDataBatch(count int) []*types.AccountData {
 	result := make([]*types.AccountData, count)
 	for index := 0; index < count; index++ {
-		result[index] = NewAccountData(common.HexToAddress(strconv.Itoa(index)), true)
+		result[index] = NewCandidateAccountData(index, 500)
 	}
 	return result
 }
@@ -105,11 +95,11 @@ func sortAccount(src []*types.AccountData) []*types.AccountData {
 
 func TestSort(t *testing.T) {
 	accounts := make([]*types.AccountData, 5)
-	accounts[0] = NewAccountDataWithVotes(common.HexToAddress(strconv.Itoa(0)), 500)
-	accounts[1] = NewAccountDataWithVotes(common.HexToAddress(strconv.Itoa(1)), 400)
-	accounts[2] = NewAccountDataWithVotes(common.HexToAddress(strconv.Itoa(2)), 500)
-	accounts[3] = NewAccountDataWithVotes(common.HexToAddress(strconv.Itoa(3)), 200)
-	accounts[4] = NewAccountDataWithVotes(common.HexToAddress(strconv.Itoa(4)), 600)
+	accounts[0] = NewCandidateAccountData(0, 500)
+	accounts[1] = NewCandidateAccountData(1, 400)
+	accounts[2] = NewCandidateAccountData(2, 500)
+	accounts[3] = NewCandidateAccountData(3, 200)
+	accounts[4] = NewCandidateAccountData(4, 600)
 
 	result := make([]*types.AccountData, 5)
 	result[0] = accounts[4]
@@ -131,9 +121,9 @@ func TestCBlock_RankingNo1(t *testing.T) {
 
 	cblock1 := NewGenesisBlock(GetBlock1(), cacheChain.Beansdb)
 
-	account1 := NewAccountData(common.HexToAddress(strconv.Itoa(0x1000)), false)
+	account1 := NewAccountData(0x1000)
 	cblock1.AccountTrieDB.Put(account1, 1)
-	account2 := NewAccountData(common.HexToAddress(strconv.Itoa(0x1001)), false)
+	account2 := NewAccountData(0x1001)
 	cblock1.AccountTrieDB.Put(account2, 1)
 
 	count := 19
@@ -146,7 +136,6 @@ func TestCBlock_RankingNo1(t *testing.T) {
 	top30 := cblock1.Top.GetTop()
 	assert.Equal(t, count, len(top30))
 	assert.Equal(t, true, equal(candidates, count, top30))
-
 }
 
 func TestCBlock_RankingNo2(t *testing.T) {
@@ -188,11 +177,11 @@ func TestCBlock_RankingNo3(t *testing.T) {
 	cblock1Candidates := clone(candidates)
 
 	cblock2 := NewNormalBlock(GetBlock2(), cblock1.AccountTrieDB, cblock1.CandidateTrieDB, cblock1.Top)
-	candidates = append(candidates, NewAccountData(common.HexToAddress(strconv.Itoa(count+1)), true))
+	candidates = append(candidates, NewCandidateAccountData(count+1, 500))
 	candidates[count].Candidate.Votes.SetInt64(30000)
 	cblock2.AccountTrieDB.Put(candidates[count], 2)
 
-	candidates = append(candidates, NewAccountData(common.HexToAddress(strconv.Itoa(count+2)), true))
+	candidates = append(candidates, NewCandidateAccountData(count+2, 500))
 	candidates[count+1].Candidate.Votes.SetInt64(30000)
 	cblock2.AccountTrieDB.Put(candidates[count+1], 2)
 	cblock2.Ranking()
@@ -218,13 +207,13 @@ func TestCBlock_RankingNo10(t *testing.T) {
 	count := 50
 	candidates := NewAccountDataBatch(count)
 
-	account1 := NewAccountData(common.HexToAddress(strconv.Itoa(0x1000)), false)
+	account1 := NewAccountData(0x1000)
 	account1.VoteFor = candidates[0].Address
 	account1.Balance.SetInt64(50000)
 	cblock1.AccountTrieDB.Put(account1, 1)
 	candidates[0].Candidate.Votes.SetInt64(50000)
 
-	account2 := NewAccountData(common.HexToAddress(strconv.Itoa(0x1001)), false)
+	account2 := NewAccountData(0x1001)
 	account2.VoteFor = candidates[9].Address
 	account2.Balance.SetInt64(40000)
 	cblock1.AccountTrieDB.Put(account2, 1)
@@ -238,11 +227,11 @@ func TestCBlock_RankingNo10(t *testing.T) {
 	cblock1Candidates := clone(candidates)
 
 	cblock2 := NewNormalBlock(GetBlock2(), cblock1.AccountTrieDB, cblock1.CandidateTrieDB, cblock1.Top)
-	candidates = append(candidates, NewAccountData(common.HexToAddress(strconv.Itoa(count)), true))
+	candidates = append(candidates, NewCandidateAccountData(count, 500))
 	candidates[count].Candidate.Votes.SetInt64(50000)
 	cblock2.AccountTrieDB.Put(candidates[count], 2)
 
-	candidates = append(candidates, NewAccountData(common.HexToAddress(strconv.Itoa(count+1)), true))
+	candidates = append(candidates, NewCandidateAccountData(count+1, 500))
 	candidates[count+1].Candidate.Votes.SetInt64(50000)
 	cblock2.AccountTrieDB.Put(candidates[count+1], 2)
 	cblock2.Ranking()
@@ -274,11 +263,11 @@ func TestCBlock_RankingNo11(t *testing.T) {
 	cblock1Candidates := clone(candidates)
 
 	cblock2 := NewNormalBlock(GetBlock2(), cblock1.AccountTrieDB, cblock1.CandidateTrieDB, cblock1.Top)
-	candidates = append(candidates, NewAccountData(common.HexToAddress(strconv.Itoa(count)), true))
+	candidates = append(candidates, NewCandidateAccountData(count, 500))
 	candidates[count].Candidate.Votes.SetInt64(20)
 	cblock2.AccountTrieDB.Put(candidates[count], 2)
 
-	candidates = append(candidates, NewAccountData(common.HexToAddress(strconv.Itoa(count+1)), true))
+	candidates = append(candidates, NewCandidateAccountData(count+1, 500))
 	candidates[count+1].Candidate.Votes.SetInt64(20)
 	cblock2.AccountTrieDB.Put(candidates[count+1], 2)
 	cblock2.Ranking()
